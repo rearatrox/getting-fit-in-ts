@@ -1,68 +1,52 @@
 # getting-fit-in-ts
-CLI Todo-Tool project in different ways to learn functionalities and service repository design pattern
 
+Ein iterativ wachsendes Lernprojekt: dasselbe Todo-CLI-Tool wird von Phase zu Phase mit mehr TypeScript-Wissen und besserer Architektur neu gebaut – von Plain JavaScript bis zu einer AWS Serverless API.
 
-# TypeScript Learning Roadmap – Todo CLI Project
+## Idee
 
-## Kontext
-Lernpfad anhand eines einzigen, iterativ wachsenden Projekts: ein **Todo-CLI-Tool**, das von Plain JavaScript bis zu einer AWS Serverless API ausgebaut wird. Kein Themenwechsel – nur wachsende Komplexität am gleichen Problem.
+Statt verschiedene Beispielprojekte zu bauen, wächst hier **ein einziges Projekt** mit jeder Phase. Das macht die Unterschiede zwischen den Ansätzen direkt vergleichbar – man sieht, welches Problem jede Phase löst und was vorher gefehlt hat.
 
----
+## Projektstruktur
 
-## Phase 1 – JS → TypeScript Grundlagen
-**Ziel:** Plain-JS-Todo-CLI direkt nach TypeScript portieren.
+```
+phase-1-a-plain-js-todo/    ← Ausgangspunkt: reines JavaScript, keine Typen
+phase-1-b-ts-todo/          ← direkte TypeScript-Migration, gleiche Logik
+phase-2-classes-generics/   ← Kapselung in Klassen, Generics eingeführt
+phase-3-repo-service-pattern/ ← Repository/Service Pattern, Dependency Injection
+phase-4-rest-api/           ← (geplant) Express-API, Service bleibt unverändert
+phase-5-aws-serverless/     ← (geplant) Lambda + DynamoDB, Repository-Swap
+```
 
-- `Todo`-Interface mit allen Feldern
-- `Status`-Union-Type: `"open" | "done" | "archived"`
-- Alle Funktionen explizit typisiert (Parameter + Rückgabewerte)
-- `unknown` statt `any` bei User-Input, Type Guards zur Absicherung
-- Speicherung in einer lokalen JSON-Datei via `fs/promises`
+Jede Phase hat eine eigene `README.md` mit den konkreten Änderungen und der Motivation für die nächste Phase.
 
----
+## Aktueller Stand
 
-## Phase 2 – Klassen & Generics
-**Ziel:** Logik in eine Klasse kapseln, Generics organisch einführen.
+| Phase | Status | Kernthema |
+|---|---|---|
+| 1a – Plain JS | ✅ | Ausgangspunkt ohne Typsystem |
+| 1b – TypeScript | ✅ | Interfaces, Union-Types, typisierte Funktionen |
+| 2 – Klassen & Generics | ✅ | Klassen, `private`/`readonly`, generische Interfaces |
+| 3 – Repository/Service | ✅ | IRepository, Dependency Injection, abstrakte Klassen |
+| 4 – REST API | ⏳ | Express, Zod, Error-Klassen |
+| 5 – AWS Serverless | ⏳ | Lambda, DynamoDB, CDK |
 
-- `TodoManager`-Klasse mit `private`, `readonly`, Konstruktor
-- `Todo<TMeta = void>` als generisches Interface – optionale Metadaten
-- Konkrete Meta-Typen: `TagMeta` (`tags`, `priority`) und `FileMeta` (`attachments`, `fileSize`)
-- Dateizugriff noch direkt in der Klasse (bewusst unsauber – wird in Phase 3 gelöst)
+## Lokale Ausführung
 
----
+Jede Phase ist ein eigenständiges Node.js-Projekt mit eigenem `package.json`.
 
-## Phase 3 – Repository/Service Pattern & Utility Types
-**Ziel:** Verantwortlichkeiten trennen, Typsystem vertiefen.
+```bash
+cd phase-3-repo-service-pattern
+npm install
+npx ts-node src/app.ts add "Einkaufen"
+npx ts-node src/app.ts list
+npx ts-node src/app.ts done <id>
+npx ts-node src/app.ts delete <id>
+```
 
-- `IRepository<T>` als Interface, `AbstractRepository` als abstrakte Basisklasse
-- `FileRepository` und `InMemoryRepository` als konkrete Implementierungen
-- `TodoService` enthält Businesslogik, kennt kein Filesystem
-- **Discriminated Unions:** Todo-Status mit Payload:
-  - `{ status: "open" }`
-  - `{ status: "done", completedAt: Date }`
-  - `{ status: "archived", reason: string }`
-  - Exhaustive checking via `never` in Switch-Statements
-- **Utility Types:** `Partial<Todo>` für Updates, `Pick` für Listenansicht, `Readonly` für den Katalog – direkt am Todo-Modell angewandt
+## Roter Faden
 
----
+Das zentrale Architekturziel, das sich durch alle Phasen zieht:
 
-## Phase 4 – REST API
-**Ziel:** CLI-Layer durch HTTP ersetzen – Service & Repository bleiben unverändert.
+> Der `TodoService` wird **nie angefasst** – egal ob die Daten aus einer Datei, einer REST API oder DynamoDB kommen.
 
-- Express-Routen ersetzen CLI-Commands
-- `TodoService` und `FileRepository` werden **ohne Änderung** wiederverwendet (Aha-Moment der Architektur)
-- Zod für Input-Validierung
-- Eigene Error-Klassen: `ValidationError`, `NotFoundError`
-- Globaler Express-Error-Handler
-- Generischer `fetchJson<T>` Wrapper für externe API-Calls
-
----
-
-## Phase 5 – AWS Serverless
-**Ziel:** Express durch Lambda ersetzen, FileRepository durch DynamoDB.
-
-- Lambda-Funktionen ersetzen Express-Routen
-- `DynamoRepository` implementiert `IRepository<Todo>` – Interface-Swap ohne Logikänderung
-- API Gateway davor
-- Deployment mit AWS CDK (TypeScript)
-
----
+Das ist möglich, weil `TodoService` nur gegen `IRepository<Todo>` programmiert ist. In Phase 4 ersetzt Express die CLI – der Service bleibt. In Phase 5 ersetzt `DynamoRepository` das `FileRepository` – der Service bleibt.
