@@ -27,7 +27,7 @@ Jede Phase hat eine eigene `README.md` mit den konkreten Änderungen und der Mot
 | 1b – TypeScript | ✅ | Interfaces, Union-Types, typisierte Funktionen |
 | 2 – Klassen & Generics | ✅ | Klassen, `private`/`readonly`, generische Interfaces |
 | 3 – Repository/Service | ✅ | IRepository, Dependency Injection, abstrakte Klassen |
-| 4 – REST API | ⏳ | Express, Zod, Error-Klassen |
+| 4 – REST API | ✅  | Express, Zod, Error-Klassen |
 | 5 – AWS Serverless | ⏳ | Lambda, DynamoDB, CDK |
 
 ## Lokale Ausführung
