@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1019.0",
+    "@aws-sdk/lib-dynamodb": "^3.1019.0",
+    "express": "^5.2.1",
+    "http-status-codes": "^2.3.0",
+    "uuid": "^13.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^6.0.2"
+  }
+}
