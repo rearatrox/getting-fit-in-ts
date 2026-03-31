@@ -6,6 +6,12 @@ class DynamoDbRepository<T extends { id: string }> implements IRepository<T> {
     private readonly client: DynamoDBDocumentClient;
     private readonly tableName: string;
 
+
+    /**
+     * 
+     * @param tableName tablename of the dynamodb table 
+     * @param endpoint optional endpoint for local testing with dynamodb-local
+     */
     constructor(tableName: string, endpoint?: string) {
         const dynamo = new DynamoDBClient({
             region: "eu-west-1",
@@ -15,7 +21,11 @@ class DynamoDbRepository<T extends { id: string }> implements IRepository<T> {
         this.tableName = tableName;
     }
 
-
+    /**
+     * creates an item with PutCommand in the given table
+     * @param item item to be created
+     * @returns created item
+     */
     async create(item: T): Promise<T> {
         const createCommand = new PutCommand({
             "TableName": this.tableName,
@@ -25,10 +35,20 @@ class DynamoDbRepository<T extends { id: string }> implements IRepository<T> {
         return item;
     }
 
+    /**
+     * creates/updates an item with PutCommand in the given table
+     * @param item 
+     * @returns updated item
+     */
     async update(item: T): Promise<T> {
         return this.create(item);
     }
 
+    /**
+     * deletes an item with DeleteCommand in the given table with a given id
+     * @param id 
+     * @returns id of deleted item
+     */
     async delete(id: string): Promise<string> {
         const command = new DeleteCommand({
             TableName: this.tableName,
@@ -37,10 +57,14 @@ class DynamoDbRepository<T extends { id: string }> implements IRepository<T> {
             },
         });
         
-       await this.client.send(command);
+       const result = await this.client.send(command);
        return id;
     }
 
+    /**
+     * gets all items of a given table
+     * @returns returns all found items of the given table
+     */
     async getAll(): Promise<T[]> {
         const scanCommand = new ScanCommand({
             "TableName": this.tableName,
@@ -49,6 +73,11 @@ class DynamoDbRepository<T extends { id: string }> implements IRepository<T> {
         return (response.Items ?? []) as unknown as T[];
     }
 
+    /**
+     * gets a specific item of a given table by a given id
+     * @param id identifier
+     * @returns returns found item
+     */
     async getById(id: string): Promise<T | undefined> {
         const getCommand = new GetCommand({
             "TableName": this.tableName,

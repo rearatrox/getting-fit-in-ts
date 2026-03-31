@@ -7,33 +7,40 @@ import { StatusCodes } from "http-status-codes";
 import { DynamoDbRepository } from "@/repositories/DynamoDbRepository";
 
 
-
 /**
- * This class implements the functionality to get all todos based on the given event
+ * This class implements the functionality to mark a todo as "done" based on the given event
+ * This should be replaced by a generic update lambda but for now its okay :)
  * 
  */
-export class GetAllTodosLambda extends LambdaBase {
+export class MarkDoneTodoLambda extends LambdaBase {
+    private eventId!: string;
 
     /**
      * @inheritdoc
      */
     async validate(): Promise<ValidationResult> {
-        return { validated: true };
+        if (!this.lambdaEvent.pathParameters?.id) {
+            return { validated: false };
+
+        } else { 
+            this.eventId = this.lambdaEvent.pathParameters.id;
+            return { validated: true };
+        };
     }
 
     /**
- * @inheritdoc
- */
+     * @inheritdoc
+     */
     async process(): Promise<APIGatewayProxyResult> {
 
         try {
             const dynamoDbRepository = new DynamoDbRepository<Todo>("todoData", "http://localhost:8000");
             const todoService = new TodoService(dynamoDbRepository);
 
-            const getAllResult = await todoService.getAll();
+            const doneResult = await todoService.done(this.eventId);
             const res: APIGatewayProxyResult = {
-                statusCode: StatusCodes.OK,
-                body: JSON.stringify({ message: "get todos successful.", item: getAllResult })
+                statusCode: StatusCodes.CREATED,
+                body: JSON.stringify({ message: "marked todo as 'done' successully.", item: doneResult })
             }
 
             return res;
@@ -59,6 +66,6 @@ export class GetAllTodosLambda extends LambdaBase {
      * ```
 */
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    const lambda = new GetAllTodosLambda(event);
+    const lambda = new MarkDoneTodoLambda(event);
     return lambda.run();
 };

@@ -6,19 +6,24 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { StatusCodes } from "http-status-codes";
 import { DynamoDbRepository } from "@/repositories/DynamoDbRepository";
 
-
-
 /**
- * This class implements the functionality to get all todos based on the given event
+ * This class implements the functionality to get a specific todo based on the given event
  * 
  */
-export class GetAllTodosLambda extends LambdaBase {
+export class GetTodoByIdLambda extends LambdaBase {
+    private eventId!: string;
 
     /**
      * @inheritdoc
      */
     async validate(): Promise<ValidationResult> {
-        return { validated: true };
+         if (!this.lambdaEvent.pathParameters?.id) {
+            return { validated: false };
+
+        } else { 
+            this.eventId = this.lambdaEvent.pathParameters.id;
+            return { validated: true };
+        };
     }
 
     /**
@@ -30,10 +35,10 @@ export class GetAllTodosLambda extends LambdaBase {
             const dynamoDbRepository = new DynamoDbRepository<Todo>("todoData", "http://localhost:8000");
             const todoService = new TodoService(dynamoDbRepository);
 
-            const getAllResult = await todoService.getAll();
+            const getIdResult = await todoService.getById(this.eventId);
             const res: APIGatewayProxyResult = {
                 statusCode: StatusCodes.OK,
-                body: JSON.stringify({ message: "get todos successful.", item: getAllResult })
+                body: JSON.stringify({ message: "get todo successful.", item: getIdResult })
             }
 
             return res;
@@ -59,6 +64,6 @@ export class GetAllTodosLambda extends LambdaBase {
      * ```
 */
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    const lambda = new GetAllTodosLambda(event);
+    const lambda = new GetTodoByIdLambda(event);
     return lambda.run();
 };

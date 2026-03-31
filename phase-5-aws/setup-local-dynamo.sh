@@ -11,7 +11,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=id,AttributeType=S \
   --key-schema AttributeName=id,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
-  --endpoint-url http://localhost:8001
+  --endpoint-url http://localhost:8000
 
 # Schritt 3: Tabelle pruefen
-aws dynamodb list-tables --endpoint-url http://localhost:8001
+aws dynamodb list-tables --endpoint-url http://localhost:8000

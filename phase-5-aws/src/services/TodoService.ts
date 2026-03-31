@@ -11,9 +11,9 @@ class TodoService {
     /**
      * 
      * @param description description for a new todo
-     * @returns id of the created todo
+     * @returns created todo
      */
-    async add(description: string): Promise<string> {
+    async add(description: string): Promise<Todo> {
         const todo: Todo = {
             id: v4(),
             description,
@@ -22,7 +22,7 @@ class TodoService {
         }
 
         await this.repository.create(todo);
-        return todo.id;
+        return todo;
     }
 
     /**
