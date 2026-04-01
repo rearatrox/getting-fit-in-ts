@@ -2,6 +2,8 @@
 
 An iteratively growing learning project: the same Todo tool is rebuilt phase by phase with more TypeScript knowledge and better architecture — from Plain JavaScript to a fully deployed AWS Serverless API.
 
+> **Everything in this project was written by hand.** The goal was to genuinely develop code independently — supported by internet research, official documentation, and GitHub Copilot as a learning aid. Copilot was never used to generate finished solutions, but as a guide for explanations, questions, and conceptual pointers. A custom agent defined in [`.github/agents/typescript-mentor.agent.md`](.github/agents/typescript-mentor.agent.md) enforced this approach: it acted as a Socratic TypeScript mentor that explained concepts and asked counter-questions — but deliberately never wrote a single line of code.
+
 ## Idea
 
 Instead of building different example projects, **a single project** grows with each phase. This makes the differences between approaches directly comparable — you can see exactly what problem each phase solves and what was missing before.
@@ -72,3 +74,7 @@ This is possible because `TodoService` only depends on `IRepository<Todo>`:
 - Phase 5 → `new TodoService(new DynamoDbRepository())`
 
 Only the repository is swapped — the service and all business logic stay identical.
+
+---
+
+*Note: While all code in this project was written by hand, the documentation (READMEs) was generated with the help of GitHub Copilot.*
