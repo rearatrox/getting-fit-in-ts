@@ -32,7 +32,8 @@ export class DeleteTodoLambda extends LambdaBase {
     async process(): Promise<APIGatewayProxyResult> {
 
         try {
-            const dynamoDbRepository = new DynamoDbRepository<Todo>("todoData", "http://localhost:8000");
+            const tableName = process.env.tableName ?? "todoData";
+            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, "http://localhost:8000");
             const todoService = new TodoService(dynamoDbRepository);
 
             const deleteResult = await todoService.delete(this.eventId);

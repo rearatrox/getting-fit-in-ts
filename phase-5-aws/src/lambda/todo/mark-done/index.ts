@@ -22,7 +22,7 @@ export class MarkDoneTodoLambda extends LambdaBase {
         if (!this.lambdaEvent.pathParameters?.id) {
             return { validated: false };
 
-        } else { 
+        } else {
             this.eventId = this.lambdaEvent.pathParameters.id;
             return { validated: true };
         };
@@ -34,7 +34,8 @@ export class MarkDoneTodoLambda extends LambdaBase {
     async process(): Promise<APIGatewayProxyResult> {
 
         try {
-            const dynamoDbRepository = new DynamoDbRepository<Todo>("todoData", "http://localhost:8000");
+            const tableName = process.env.tableName ?? "todoData";
+            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, "http://localhost:8000");
             const todoService = new TodoService(dynamoDbRepository);
 
             const doneResult = await todoService.done(this.eventId);

@@ -34,7 +34,8 @@ export class CreateTodoLambda extends LambdaBase {
     async process(): Promise<APIGatewayProxyResult> {
 
         try {
-            const dynamoDbRepository = new DynamoDbRepository<Todo>("todoData", "http://localhost:8000");
+            const tableName = process.env.tableName ?? "todoData";
+            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, "http://localhost:8000");
             const todoService = new TodoService(dynamoDbRepository);
 
             const createResult = await todoService.add(this.parsedEvent.description);
