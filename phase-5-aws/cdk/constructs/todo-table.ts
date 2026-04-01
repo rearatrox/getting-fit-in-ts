@@ -1,5 +1,6 @@
 import { Construct } from "constructs";
-import {AttributeType, Table} from 'aws-cdk-lib/aws-dynamodb';
+import { AttributeType, Table } from 'aws-cdk-lib/aws-dynamodb';
+import { RemovalPolicy } from "aws-cdk-lib";
 
 
 export interface TableProps {
@@ -18,6 +19,7 @@ export class TodoTableConstruct extends Construct {
         this.todoTable = new Table(this, 'todoDataTable', {
             tableName: props.tableName,
             partitionKey: {name: "id", type: AttributeType.STRING},
-        } )
+            removalPolicy: RemovalPolicy.DESTROY,
+        })
     }
 }

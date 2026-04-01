@@ -33,7 +33,7 @@ export class DeleteTodoLambda extends LambdaBase {
 
         try {
             const tableName = process.env.tableName ?? "todoData";
-            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, "http://localhost:8000");
+            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, process.env.DYNAMO_ENDPOINT);
             const todoService = new TodoService(dynamoDbRepository);
 
             const deleteResult = await todoService.delete(this.eventId);

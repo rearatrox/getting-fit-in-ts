@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { RestApi, LambdaIntegration } from "aws-cdk-lib/aws-apigateway";
+import { RestApi, LambdaIntegration, ApiKey, UsagePlan, ApiKeySourceType, Period } from "aws-cdk-lib/aws-apigateway";
 import { TodoLambdasConstruct } from "./todo-lambdas";
 
 
@@ -14,16 +14,38 @@ export class TodoRestApi extends Construct {
         super(scope, id);
 
         const lambdas = props.lambdas;
-        const api = new RestApi(this, 'TodoApi');
-        const todos = api.root.addResource('todos');
+        const api = new RestApi(this, 'TodoApi', {
+            apiKeySourceType: ApiKeySourceType.HEADER,
+        });
 
-        todos.addMethod('GET', new LambdaIntegration(lambdas.getAllTodosLambda));
-        todos.addMethod('POST', new LambdaIntegration(lambdas.createTodoLambda));
+        const todos = api.root.addResource('todos');
+        todos.addMethod('GET', new LambdaIntegration(lambdas.getAllTodosLambda), { apiKeyRequired: true });
+        todos.addMethod('POST', new LambdaIntegration(lambdas.createTodoLambda), { apiKeyRequired: true });
 
         const todoById = todos.addResource('{id}');
-        todoById.addMethod('GET', new LambdaIntegration(lambdas.getByIdTodoLambda));
-        todoById.addMethod('PUT', new LambdaIntegration(lambdas.markDoneTodoLambda));
-        todoById.addMethod('DELETE', new LambdaIntegration(lambdas.deleteTodoLambda));
+        todoById.addMethod('GET', new LambdaIntegration(lambdas.getByIdTodoLambda), { apiKeyRequired: true });
+        todoById.addMethod('PUT', new LambdaIntegration(lambdas.markDoneTodoLambda), { apiKeyRequired: true });
+        todoById.addMethod('DELETE', new LambdaIntegration(lambdas.deleteTodoLambda), { apiKeyRequired: true });
 
+
+        // added for security reasons (crawler/ddos attacks against api)
+        const apiKey = new ApiKey(this, 'TodoApiKey', {
+            description: 'API Key für persönlichen Zugriff',
+        });
+
+        const usagePlan = new UsagePlan(this, 'TodoUsagePlan', {
+            name: 'TodoUsagePlan',
+            throttle: {
+                rateLimit: 10,
+                burstLimit: 20,
+            },
+            quota: {
+                limit: 1000,
+                period: Period.MONTH,
+            },
+        });
+
+        usagePlan.addApiKey(apiKey);
+        usagePlan.addApiStage({ api, stage: api.deploymentStage });
     }
 }

@@ -33,7 +33,7 @@ export class GetTodoByIdLambda extends LambdaBase {
 
         try {
             const tableName = process.env.tableName ?? "todoData";
-            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, "http://localhost:8000");
+            const dynamoDbRepository = new DynamoDbRepository<Todo>(tableName, process.env.DYNAMO_ENDPOINT);
             const todoService = new TodoService(dynamoDbRepository);
 
             const getIdResult = await todoService.getById(this.eventId);
