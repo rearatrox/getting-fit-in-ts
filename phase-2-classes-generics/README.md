@@ -1,12 +1,12 @@
-# Phase 2 – Klassen & Generics
+# Phase 2 – Classes & Generics
 
-## Ziel
-Die losen Funktionen aus Phase 1b in eine Klasse kapseln und Generics einführen, um optionale Metadaten an Todos anhängen zu können.
+## Goal
+Encapsulate the loose functions from Phase 1b into a class and introduce generics to allow attaching optional metadata to todos.
 
-## Änderungen gegenüber Phase 1b
+## Changes Compared to Phase 1b
 
-### Neu: `Todos<TData>`-Klasse
-Alle Funktionen wurden in eine Klasse zusammengefasst. Die Klasse hält die geladenen Todos als internen Zustand – kein wiederholter Dateizugriff mehr pro Operation.
+### New: `Todos<TData>` Class
+All functions were combined into a single class. The class holds the loaded todos as internal state — no repeated file access per operation.
 
 ```typescript
 class Todos<TData> {
@@ -15,64 +15,64 @@ class Todos<TData> {
 }
 ```
 
-**Neue Konzepte:**
-- `private` – internes Array ist von außen nicht zugreifbar
-- `readonly` – `fileName` kann nach der Initialisierung nicht mehr verändert werden
-- Konstruktor initialisiert `todos` mit einem leeren Array
+**New concepts:**
+- `private` — the internal array is not accessible from outside
+- `readonly` — `fileName` cannot be changed after initialization
+- The constructor initializes `todos` with an empty array
 
-### Neu: Generisches `Todo<TData>`-Interface
+### New: Generic `Todo<TData>` Interface
 ```typescript
 interface Todo<TData> {
     id: string,
     description: string,
     status?: Status,
     createdAt: Date | string;
-    data: TData;          // ← optionale Metadaten
+    data: TData;          // ← optional metadata
 }
 ```
-Das Interface ist nun generisch – `TData` kann ein beliebiger Typ sein. Beim Erstellen ohne Metadaten wird `void | undefined` verwendet.
+The interface is now generic — `TData` can be any type. When creating todos without metadata, `void | undefined` is used.
 
-### Neu: `TagMeta`-Interface
+### New: `TagMeta` Interface
 ```typescript
 interface TagMeta {
     tags: string[],
     priority: Priority
 }
 ```
-Konkrete Implementierung von Metadaten. Todos können optional mit Tags und Priorität versehen werden.
+A concrete metadata implementation. Todos can optionally be tagged and assigned a priority.
 
-### Neu: `Priority`-Union-Type
+### New: `Priority` Union Type
 ```typescript
 type Priority = "low" | "medium" | "high";
 ```
 
-### Geändert: Dateizugriff zentralisiert
-Statt in jeder Funktion einzeln zu lesen/schreiben gibt es jetzt zwei dedizierte Methoden:
-- `loadFile()` – einmalig beim Start aufrufen
-- `saveFile()` – einmalig am Ende aufrufen
+### Changed: Centralized File Access
+Instead of reading/writing in every function individually, there are now two dedicated methods:
+- `loadFile()` — call once at startup
+- `saveFile()` — call once at the end
 
-### Geändert: Klassen-Instanz in `app.ts`
+### Changed: Class Instance in `app.ts`
 ```typescript
 const todoManager = new Todos<void | TagMeta>();
 await todoManager.loadFile();
-// ... switch-block ...
+// ... switch block ...
 await todoManager.saveFile();
 ```
 
-## Dateistruktur
+## File Structure
 ```
 src/
-  app.ts                        ← CLI-Switch-Block mit Klassen-Instanz
-  TodoClass.ts                  ← Todos<TData>-Klasse
+  app.ts                        ← CLI switch block with class instance
+  TodoClass.ts                  ← Todos<TData> class
   models/
     interfaces/
       todo.ts                   ← Todo<TData> + TagMeta
     types/
-      status.ts                 ← Status-Union-Type
-      priority.ts               ← Priority-Union-Type
+      status.ts                 ← Status union type
+      priority.ts               ← Priority union type
 ```
 
-## Was noch fehlt (Motivation für Phase 3)
-- `loadFile` und `saveFile` sind in derselben Klasse wie die Business-Logik
-- Die Klasse kann nicht ohne Dateisystem getestet werden
-- Das Repository-Pattern würde Datenzugriff und Logik sauber trennen
+## What's Still Missing (Motivation for Phase 3)
+- `loadFile` and `saveFile` live in the same class as the business logic — it violates the Single Responsibility Principle
+- The class cannot be tested without a real filesystem
+- The Repository Pattern (Phase 3) would cleanly separate data access from business logic and makes the service interchangeable across different data stores

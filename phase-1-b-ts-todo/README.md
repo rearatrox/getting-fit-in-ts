@@ -1,16 +1,16 @@
 # Phase 1b – TypeScript Migration
 
-## Ziel
-Den Plain-JS-Code aus Phase 1a direkt nach TypeScript portieren – gleiche Logik, aber mit Typsystem. Kein Refactoring, nur Typen hinzufügen.
+## Goal
+Port the plain JS code from Phase 1a directly to TypeScript — same logic, but with a type system. No refactoring, just adding types.
 
-## Änderungen gegenüber Phase 1a
+## Changes Compared to Phase 1a
 
-### Neu: TypeScript
+### New: TypeScript
 - `.js` → `.ts`
-- `tsconfig.json` mit strikten Compiler-Optionen (`strict: true`)
-- `@/`-Pfad-Alias für saubere Imports
+- `tsconfig.json` with strict compiler options (`strict: true`)
+- `@/` path alias for clean imports
 
-### Neu: `Todo`-Interface
+### New: `Todo` Interface
 ```typescript
 interface Todo {
     id: string,
@@ -20,37 +20,37 @@ interface Todo {
     createdAt: Date | string;
 }
 ```
-Das Todo-Objekt ist nun klar definiert – die IDE kennt alle Felder, Tippfehler werden sofort erkannt.
+The Todo object is now clearly defined — the IDE knows all fields and typos are caught immediately.
 
-### Neu: `Status`-Union-Type
+### New: `Status` Union Type
 ```typescript
 type Status = "open" | "done";
 ```
-`status` kann nur noch `"open"` oder `"done"` annehmen. Ein Wert wie `"oepn"` würde einen Compile-Fehler erzeugen.
+`status` can now only be `"open"` or `"done"`. A value like `"oepn"` would produce a compile error.
 
-### Geändert: Alle Funktionen explizit typisiert
-- Parameter haben Typen: `title: string`, `id: string`
-- Rückgabewerte haben Typen: `Promise<void>`
-- Arrays haben Typen: `Todo[]` statt implizitem `any[]`
+### Changed: All Functions Explicitly Typed
+- Parameters have types: `title: string`, `id: string`
+- Return values have types: `Promise<void>`
+- Arrays have types: `Todo[]` instead of implicit `any[]`
 
-### Geändert: `JSON.parse` mit Typ-Annotation
+### Changed: `JSON.parse` with Type Annotation
 ```typescript
 let fileArray: Todo[] = JSON.parse(file.toString());
 ```
-Statt einem ungetypten `any`-Array weiß TypeScript nun, dass es sich um `Todo[]` handelt.
+Instead of an untyped `any` array, TypeScript now knows it's a `Todo[]`.
 
-## Dateistruktur
+## File Structure
 ```
 src/
-  app.ts                        ← portierte Funktionen + CLI-Switch-Block
+  app.ts                        ← ported functions + CLI switch block
   models/
     interfaces/
-      todo.ts                   ← Todo-Interface
+      todo.ts                   ← Todo interface
     types/
-      status.ts                 ← Status-Union-Type
+      status.ts                 ← Status union type
 ```
 
-## Was noch fehlt (Motivation für Phase 2)
-- Alle Funktionen lesen/schreiben die Datei **einzeln** – viel duplizierter Dateizugriffscode
-- Keine Kapselung – Logik und Persistenz sind vermischt
-- Eine Klasse würde den Zustand (geladene Todos) zentral halten
+## What's Still Missing (Motivation for Phase 2)
+- All functions read/write the file **individually** — a lot of duplicated file access code
+- No encapsulation — logic and persistence are mixed together
+- A class would hold the state (loaded todos) centrally

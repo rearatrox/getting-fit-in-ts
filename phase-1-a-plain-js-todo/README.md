@@ -1,34 +1,34 @@
-# Phase 1a – Plain JavaScript Todo-CLI
+# Phase 1a – Plain JavaScript Todo CLI
 
-## Ziel
-Ein funktionierendes Todo-CLI-Tool in reinem JavaScript schreiben – bewusst ohne Typsystem. Diese Phase dient als Ausgangspunkt und zeigt, welche Probleme ohne TypeScript entstehen.
+## Goal
+Write a working Todo CLI tool in plain JavaScript — intentionally without a type system. This phase serves as the starting point and demonstrates the problems that arise without TypeScript.
 
-## Was wurde implementiert
+## What Was Implemented
 
-### Befehle
-| Befehl | Beschreibung |
+### Commands
+| Command | Description |
 |---|---|
-| `node app.js add <title> [description]` | Neues Todo erstellen |
-| `node app.js list` | Alle Todos anzeigen |
-| `node app.js list <id>` | Einzelnes Todo anzeigen |
-| `node app.js done <id>` | Todo als erledigt markieren |
-| `node app.js delete <id>` | Todo löschen |
+| `node app.js add <title> [description]` | Create a new todo |
+| `node app.js list` | Show all todos |
+| `node app.js list <id>` | Show a single todo |
+| `node app.js done <id>` | Mark a todo as done |
+| `node app.js delete <id>` | Delete a todo |
 
-### Technische Umsetzung
-- **Persistenz:** `todos.json` via `fs/promises`
+### Technical Implementation
+- **Persistence:** `todos.json` via `fs/promises`
 - **IDs:** `uuid v4`
-- **Top-Level `await`** möglich durch `"type": "module"` in `package.json`
-- Alle Funktionen sind `async`, da Dateizugriffe asynchron sind
+- **Top-level `await`** enabled via `"type": "module"` in `package.json`
+- All functions are `async` since file access is asynchronous
 
-### Dateistruktur
+### File Structure
 ```
-app.js         ← alle Funktionen + CLI-Switch-Block
-todos.json     ← generierte Datei zur Laufzeit
+app.js         ← all functions + CLI switch block
+todos.json     ← generated at runtime
 ```
 
-## Erkannte Probleme (Motivation für Phase 1b)
+## Identified Problems (Motivation for Phase 1b)
 
-- **Keine Typsicherheit:** `status` kann jeden beliebigen String annehmen – `"oepn"` wäre genauso gültig wie `"open"`
-- **Keine Objektstruktur:** Das `Todo`-Objekt ist nicht definiert – jede Funktion baut es ad-hoc zusammen
-- **Kein Autovervollständigung:** Die IDE weiß nicht, welche Felder ein Todo hat
-- **Kein Compile-Fehler:** Tippfehler oder falsche Typen fallen erst zur Laufzeit auf
+- **No type safety:** `status` can be any string — `"oepn"` would be just as valid as `"open"`
+- **No object structure:** The `Todo` object is not defined — each function builds it ad-hoc
+- **No autocompletion:** The IDE has no knowledge of which fields a todo has
+- **No compile errors:** Typos or wrong types only surface at runtime

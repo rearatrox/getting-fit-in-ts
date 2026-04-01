@@ -1,100 +1,135 @@
-# Phase 3 – Repository/Service Pattern
+# Phase 4 – REST API with Express
 
-## Ziel
-Verantwortlichkeiten sauber trennen: Business-Logik im Service, Datenzugriff im Repository. Der Service kennt kein Filesystem mehr – er arbeitet nur gegen ein Interface.
+## Goal
+Replace the CLI from Phase 3 with a fully-featured HTTP REST API. The `TodoService` remains completely unchanged — only `app.ts` and a new router layer are added.
 
-## Änderungen gegenüber Phase 2
+## Changes Compared to Phase 3
 
-### Kernproblem aus Phase 2
-Die `Todos`-Klasse war für zwei Dinge zuständig: Business-Logik (`done`, `delete`, ...) **und** Persistenz (`loadFile`, `saveFile`). Das macht Testen ohne echte Dateien unmöglich.
+### Core Problem from Phase 3
+The CLI tool in `app.ts` was only usable locally via the command line. No external access, no parallel requests, no standardized interface for other clients.
 
-### Neue Architektur
+### New Architecture
 
 ```
-IRepository<T>              ← Interface: definiert den Vertrag (was)
-      ↑
-AbstractRepository<T>       ← abstrakte Klasse: gemeinsame Array-Logik (getAll, getById)
-      ↑
-InMemoryRepository<T>       ← konkret: nur Array, kein Filesystem (ideal für Tests)
-      ↑
-FileRepository<T>           ← konkret: Array + JSON-Dateipersistenz
-
-TodoService                 ← Business-Logik, kennt nur IRepository<Todo>
+Express App (app.ts)
+      ↓
+todoRoutes.ts (Router)       ← HTTP routes, Zod validation, ApiResponse<T>
+      ↓
+TodoService                  ← unchanged from Phase 3
+      ↓
+FileRepository → todos.json
 ```
 
-### Neu: `IRepository<T>`
-Generisches Interface mit CRUD-Methoden. Alle Methoden geben `Promise` zurück, damit das Interface sowohl für synchrone (InMemory) als auch asynchrone (File, Dynamo) Implementierungen gilt.
+### New: Express REST API
+
+`app.ts` starts an Express server on port 3000 and mounts the router at `/api/todo`:
 
 ```typescript
-interface IRepository<T extends { id: string }> {
-    getAll(): Promise<T[]>;
-    getById(id: string): Promise<T | undefined>;
-    create(item: T): Promise<T>;
-    update(item: T): Promise<T>;
-    delete(id: string): Promise<string>;
+const fileRepo = await FileRepository.create<Todo>();
+const todoService = new TodoService(fileRepo);
+const router = createTodoRouter(todoService);
+app.use("/api/todo", router);
+app.listen(3000);
+```
+
+### New: `todoRoutes.ts`
+
+All 5 endpoints are implemented:
+
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/api/todo` | Retrieve all todos |
+| `POST` | `/api/todo` | Create a new todo |
+| `GET` | `/api/todo/:id` | Retrieve a single todo |
+| `PATCH` | `/api/todo/:id/done` | Mark a todo as done |
+| `DELETE` | `/api/todo/:id` | Delete a todo |
+
+### New: `ApiResponse<T>` – Generic Response Type
+
+All routes return a consistent response structure:
+
+```typescript
+type ApiResponse<T> = {
+    statusCode: number,
+    timestamp: string,
+    message: string,
+    item: T,
 }
 ```
 
-### Neu: `AbstractRepository<T>`
-Abstrakte Basisklasse mit `protected items: T[] = []`. Implementiert `getAll` und `getById` – diese Logik ist für alle Implementierungen identisch. `create`, `update`, `delete` sind `abstract` – müssen von Subklassen implementiert werden.
+### New: Zod Validation for POST
 
-### Neu: `InMemoryRepository<T>`
-Konkrete Implementierung, die nur mit dem internen Array arbeitet. Kein Filesystem. Primär für Tests gedacht – der `TodoService` kann damit ohne Datei getestet werden.
+The request body is validated with Zod before it reaches the service:
 
-### Neu: `FileRepository<T>`
-Erweitert `InMemoryRepository` und ergänzt nach jeder Mutation (`create`, `update`, `delete`) ein `saveFile()`. Nutzt `super.methode()` um die Array-Logik der Elternklasse wiederzuverwenden.
-
-**Static Factory Method** für sichere Initialisierung:
 ```typescript
-static async create<T extends { id: string }>(): Promise<FileRepository<T>> {
-    const repo = new FileRepository<T>();
-    await repo.loadFile();
-    return repo;
+const postBody = z.object({
+    description: z.string().min(1),
+});
+const result = postBody.safeParse(req.body);
+if (!result.success) throw new ValidationError();
+```
+
+### New: Custom Error Classes
+
+```typescript
+class NotFoundError extends Error {
+    public readonly statusCode = 404;
+}
+
+class ValidationError extends Error {
+    public readonly statusCode = 400;
 }
 ```
 
-### Neu: `TodoService`
-Enthält die gesamte Business-Logik. Bekommt ein `IRepository<Todo>` per **Dependency Injection** im Konstruktor – weiß nicht, ob dahinter ein File, InMemory oder DynamoDB steckt.
+### New: `errorHandler` Middleware
+
+Centralized error handling for all routes. Known errors (`NotFoundError`, `ValidationError`) are returned with their `statusCode`; unknown errors always return `500`:
 
 ```typescript
-class TodoService {
-    constructor(private readonly repository: IRepository<Todo>) {}
+function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction) {
+    if (err instanceof NotFoundError || err instanceof ValidationError) {
+        return res.status(err.statusCode).json({ statusCode: err.statusCode, message: err.message });
+    } else {
+        return res.status(500).json({ statusCode: 500, message: "Internal server error." });
+    }
 }
 ```
 
-### Geändert: `app.ts`
-Verdrahtet Repository und Service mittels IIFE-Pattern:
-```typescript
-(async () => {
-    const fileRepo = await FileRepository.create<Todo>();
-    const todoService = new TodoService(fileRepo);
-    // switch-block ...
-})();
-```
+Every route calls `next(error)` in its `catch` block so errors are handled centrally.
 
-### Geändert: `Todo`-Interface
-`data` ist nun optional (`data?: TData`) statt zwingend erforderlich.
+## File Structure
 
-## Dateistruktur
 ```
 src/
-  app.ts
+  app.ts                      ← Express setup, IIFE, port 3000
+  routes/
+    todoRoutes.ts             ← router with all 5 endpoints + Zod
+  errors/
+    NotFoundError.ts          ← statusCode 404
+    ValidationError.ts        ← statusCode 400
+  middleware/
+    errorHandler.ts           ← centralized error handling
   models/
     interfaces/todo.ts
     types/status.ts + priority.ts
-  repositories/
+  repositories/               ← unchanged from Phase 3
     IRepository.ts
     AbstractRepository.ts
     InMemoryRepository.ts
     FileRepository.ts
   services/
-    TodoService.ts
+    TodoService.ts            ← unchanged from Phase 3
 ```
 
-## Kernkonzept: Dependency Inversion
-Der `TodoService` hängt nicht von `FileRepository` ab, sondern von `IRepository<Todo>`. Das bedeutet:
-- In **Tests**: `new TodoService(new InMemoryRepository())`
-- In **Produktion**: `new TodoService(new FileRepository())`
-- In **Phase 5**: `new TodoService(new DynamoRepository())`
+## Running Locally
 
-Der Service wird dabei **nie angefasst** – nur das Repository wird ausgetauscht.
+```bash
+npm install
+npx ts-node src/app.ts
+# Server running at http://localhost:3000/api/todo
+```
+
+## What's Still Missing (Motivation for Phase 5)
+- The server runs locally — no hosting, no scaling, no managed service
+- `FileRepository` writes to the local disk — not scalable in the cloud
+- Phase 5 deploys the API as AWS Lambda + DynamoDB via CDK, replacing only `FileRepository` with `DynamoDbRepository`

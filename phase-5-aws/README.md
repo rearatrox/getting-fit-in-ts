@@ -1,100 +1,185 @@
-# Phase 3 – Repository/Service Pattern
+# Phase 5 – AWS Serverless with Lambda, DynamoDB & CDK
 
-## Ziel
-Verantwortlichkeiten sauber trennen: Business-Logik im Service, Datenzugriff im Repository. Der Service kennt kein Filesystem mehr – er arbeitet nur gegen ein Interface.
+## Goal
+Replace the Express REST API from Phase 4 with a fully serverless AWS architecture. `FileRepository` is swapped for `DynamoDbRepository` — the `TodoService` remains unchanged. All infrastructure is managed as code with AWS CDK.
 
-## Änderungen gegenüber Phase 2
+## Changes Compared to Phase 4
 
-### Kernproblem aus Phase 2
-Die `Todos`-Klasse war für zwei Dinge zuständig: Business-Logik (`done`, `delete`, ...) **und** Persistenz (`loadFile`, `saveFile`). Das macht Testen ohne echte Dateien unmöglich.
+### Core Problem from Phase 4
+The Express server ran locally and was not scalable. `FileRepository` writes to a local file — not viable in the cloud.
 
-### Neue Architektur
+### New Architecture
 
 ```
-IRepository<T>              ← Interface: definiert den Vertrag (was)
-      ↑
-AbstractRepository<T>       ← abstrakte Klasse: gemeinsame Array-Logik (getAll, getById)
-      ↑
-InMemoryRepository<T>       ← konkret: nur Array, kein Filesystem (ideal für Tests)
-      ↑
-FileRepository<T>           ← konkret: Array + JSON-Dateipersistenz
-
-TodoService                 ← Business-Logik, kennt nur IRepository<Todo>
+API Gateway (REST API)        ← public HTTP interface secured with API Key
+      ↓
+AWS Lambda (NodejsFunction)   ← one handler per route
+      ↓
+LambdaBase (abstract class)   ← validate() + process() + run() orchestration
+      ↓
+TodoService                   ← unchanged from Phase 3/4
+      ↓
+DynamoDbRepository            ← replaces FileRepository, uses AWS SDK v3
+      ↓
+DynamoDB (AWS)                ← persistent cloud data store
 ```
 
-### Neu: `IRepository<T>`
-Generisches Interface mit CRUD-Methoden. Alle Methoden geben `Promise` zurück, damit das Interface sowohl für synchrone (InMemory) als auch asynchrone (File, Dynamo) Implementierungen gilt.
+### New: `LambdaBase` – Abstract Base for All Lambda Handlers
+
+Each Lambda is implemented as a class extending `LambdaBase`:
 
 ```typescript
-interface IRepository<T extends { id: string }> {
-    getAll(): Promise<T[]>;
-    getById(id: string): Promise<T | undefined>;
-    create(item: T): Promise<T>;
-    update(item: T): Promise<T>;
-    delete(id: string): Promise<string>;
+abstract class LambdaBase {
+    protected readonly lambdaEvent: APIGatewayProxyEvent;
+    abstract validate(): Promise<ValidationResult>;
+    abstract process(): Promise<APIGatewayProxyResult>;
+    async run(): Promise<APIGatewayProxyResult> { ... }
 }
 ```
 
-### Neu: `AbstractRepository<T>`
-Abstrakte Basisklasse mit `protected items: T[] = []`. Implementiert `getAll` und `getById` – diese Logik ist für alle Implementierungen identisch. `create`, `update`, `delete` sind `abstract` – müssen von Subklassen implementiert werden.
+`run()` orchestrates the flow: first `validate()`, on failure → 400, then `process()`, on unknown error → 500.
 
-### Neu: `InMemoryRepository<T>`
-Konkrete Implementierung, die nur mit dem internen Array arbeitet. Kein Filesystem. Primär für Tests gedacht – der `TodoService` kann damit ohne Datei getestet werden.
+### New: 5 Lambda Handlers
 
-### Neu: `FileRepository<T>`
-Erweitert `InMemoryRepository` und ergänzt nach jeder Mutation (`create`, `update`, `delete`) ein `saveFile()`. Nutzt `super.methode()` um die Array-Logik der Elternklasse wiederzuverwenden.
+| Class | HTTP Method | Route |
+|---|---|---|
+| `GetAllTodosLambda` | `GET` | `/todos` |
+| `CreateTodoLambda` | `POST` | `/todos` |
+| `GetByIdTodoLambda` | `GET` | `/todos/{id}` |
+| `MarkDoneTodoLambda` | `PUT` | `/todos/{id}` |
+| `DeleteTodoLambda` | `DELETE` | `/todos/{id}` |
 
-**Static Factory Method** für sichere Initialisierung:
+Every handler follows the same pattern:
 ```typescript
-static async create<T extends { id: string }>(): Promise<FileRepository<T>> {
-    const repo = new FileRepository<T>();
-    await repo.loadFile();
-    return repo;
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    return new XxxTodoLambda(event).run();
+};
+```
+
+### New: `DynamoDbRepository<T>`
+
+Implements `IRepository<T>` using AWS SDK v3 (`@aws-sdk/lib-dynamodb`). The `endpoint` parameter is optional — when omitted, the client automatically connects to real AWS DynamoDB:
+
+```typescript
+constructor(tableName: string, endpoint?: string) {
+    const dynamo = new DynamoDBClient({
+        region: "eu-west-1",
+        ...(endpoint ? { endpoint } : {})
+    });
 }
 ```
 
-### Neu: `TodoService`
-Enthält die gesamte Business-Logik. Bekommt ein `IRepository<Todo>` per **Dependency Injection** im Konstruktor – weiß nicht, ob dahinter ein File, InMemory oder DynamoDB steckt.
+For local testing: set `DYNAMO_ENDPOINT=http://localhost:8000`.
 
-```typescript
-class TodoService {
-    constructor(private readonly repository: IRepository<Todo>) {}
-}
+### New: CDK Infrastructure
+
+All infrastructure lives as TypeScript code in the `cdk/` folder, split into three constructs:
+
+```
+cdk/
+  bin/cdk.ts                  ← CDK app entry point
+  lib/cdk-stack.ts            ← CdkStack: wires all constructs together
+  constructs/
+    todo-table.ts             ← DynamoDB table (RemovalPolicy.DESTROY)
+    todo-lambdas.ts           ← 5 NodejsFunction instances with esbuild bundling
+    todo-api.ts               ← RestApi, LambdaIntegration, ApiKey, UsagePlan
+  constants/
+    config.ts                 ← tableName: "todoData"
 ```
 
-### Geändert: `app.ts`
-Verdrahtet Repository und Service mittels IIFE-Pattern:
-```typescript
-(async () => {
-    const fileRepo = await FileRepository.create<Todo>();
-    const todoService = new TodoService(fileRepo);
-    // switch-block ...
-})();
+**`TodoTableConstruct`** – DynamoDB table:
+- Partition key: `id` (String)
+- `RemovalPolicy.DESTROY` — table is deleted on `cdk destroy`
+
+**`TodoLambdasConstruct`** – Lambda functions:
+- `NodejsFunction` with automatic esbuild bundling
+- Table name passed as `tableName` environment variable
+- `readLambdas` and `writeLambdas` arrays for IAM permission management
+
+**`TodoRestApi`** – API Gateway:
+- REST API with `ApiKeySourceType.HEADER`
+- All routes with `apiKeyRequired: true`
+- `ApiKey` + `UsagePlan` with throttling (`10 req/s`, burst `20`) and monthly quota (`1000 requests`)
+
+## File Structure
+
+```
+phase-5-aws/
+  src/
+    app.ts                    ← local test runner with mock events
+    lambda/
+      LambdaBase.ts           ← abstract base class
+      todo/
+        create/index.ts
+        delete/index.ts
+        get-all/index.ts
+        get-by-id/index.ts
+        mark-done/index.ts
+    repositories/
+      IRepository.ts          ← unchanged from Phase 3
+      AbstractRepository.ts
+      DynamoDbRepository.ts   ← new: AWS SDK v3
+    services/
+      TodoService.ts          ← unchanged from Phase 3/4
+    models/
+      interfaces/todo.ts
+      interfaces/validationResult.ts
+      errors/NotFoundError.ts
+      errors/ValidationError.ts
+  cdk/                        ← CDK infrastructure
+  setup-local-dynamo.sh       ← set up DynamoDB Local
 ```
 
-### Geändert: `Todo`-Interface
-`data` ist nun optional (`data?: TData`) statt zwingend erforderlich.
+## Local Testing
 
-## Dateistruktur
-```
-src/
-  app.ts
-  models/
-    interfaces/todo.ts
-    types/status.ts + priority.ts
-  repositories/
-    IRepository.ts
-    AbstractRepository.ts
-    InMemoryRepository.ts
-    FileRepository.ts
-  services/
-    TodoService.ts
+```bash
+# 1. Start DynamoDB Local
+docker run -d -p 8000:8000 amazon/dynamodb-local
+
+# 2. Create table locally
+bash setup-local-dynamo.sh
+
+# 3. Run the app with local DynamoDB
+DYNAMO_ENDPOINT=http://localhost:8000 npx ts-node src/app.ts
 ```
 
-## Kernkonzept: Dependency Inversion
-Der `TodoService` hängt nicht von `FileRepository` ab, sondern von `IRepository<Todo>`. Das bedeutet:
-- In **Tests**: `new TodoService(new InMemoryRepository())`
-- In **Produktion**: `new TodoService(new FileRepository())`
-- In **Phase 5**: `new TodoService(new DynamoRepository())`
+## Deployment with CDK
 
-Der Service wird dabei **nie angefasst** – nur das Repository wird ausgetauscht.
+```bash
+cd cdk
+npm install
+
+# One-time: bootstrap CDK (per account/region)
+cdk bootstrap
+
+# Deploy the stack
+cdk deploy
+
+# Tear down the stack
+cdk destroy
+```
+
+## API Endpoints (Deployed)
+
+Base URL: `https://<api-id>.execute-api.eu-west-1.amazonaws.com/prod`
+
+All requests require the header: `x-api-key: <your-api-key>`
+
+| Method | Path | Body | Description |
+|---|---|---|---|
+| `GET` | `/todos` | – | Retrieve all todos |
+| `POST` | `/todos` | `{ "description": "..." }` | Create a new todo |
+| `GET` | `/todos/{id}` | – | Retrieve a single todo |
+| `PUT` | `/todos/{id}` | – | Mark a todo as done |
+| `DELETE` | `/todos/{id}` | – | Delete a todo |
+
+## Core Concept: Repository Swap
+
+The `TodoService` was never modified. In Phase 5, only the repository is swapped:
+
+```
+Phase 3/4:  new TodoService(new FileRepository())
+Phase 5:    new TodoService(new DynamoDbRepository(tableName, process.env.DYNAMO_ENDPOINT))
+```
+
+This demonstrates dependency inversion in practice: the implementation is interchangeable as long as it satisfies the `IRepository<T>` interface.

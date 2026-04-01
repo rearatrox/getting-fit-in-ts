@@ -1,29 +1,29 @@
 # Phase 3 – Repository/Service Pattern
 
-## Ziel
-Verantwortlichkeiten sauber trennen: Business-Logik im Service, Datenzugriff im Repository. Der Service kennt kein Filesystem mehr – er arbeitet nur gegen ein Interface.
+## Goal
+Cleanly separate responsibilities: business logic in the service, data access in the repository. The service no longer knows about the filesystem — it only works against an interface.
 
-## Änderungen gegenüber Phase 2
+## Changes Compared to Phase 2
 
-### Kernproblem aus Phase 2
-Die `Todos`-Klasse war für zwei Dinge zuständig: Business-Logik (`done`, `delete`, ...) **und** Persistenz (`loadFile`, `saveFile`). Das macht Testen ohne echte Dateien unmöglich.
+### Core Problem from Phase 2
+The `Todos` class was responsible for two things: business logic (`done`, `delete`, ...) **and** persistence (`loadFile`, `saveFile`). This makes testing without real files impossible.
 
-### Neue Architektur
+### New Architecture
 
 ```
-IRepository<T>              ← Interface: definiert den Vertrag (was)
+IRepository<T>              ← interface: defines the contract (what)
       ↑
-AbstractRepository<T>       ← abstrakte Klasse: gemeinsame Array-Logik (getAll, getById)
+AbstractRepository<T>       ← abstract class: shared array logic (getAll, getById)
       ↑
-InMemoryRepository<T>       ← konkret: nur Array, kein Filesystem (ideal für Tests)
+InMemoryRepository<T>       ← concrete: array only, no filesystem (ideal for tests)
       ↑
-FileRepository<T>           ← konkret: Array + JSON-Dateipersistenz
+FileRepository<T>           ← concrete: array + JSON file persistence
 
-TodoService                 ← Business-Logik, kennt nur IRepository<Todo>
+TodoService                 ← business logic, only knows IRepository<Todo>
 ```
 
-### Neu: `IRepository<T>`
-Generisches Interface mit CRUD-Methoden. Alle Methoden geben `Promise` zurück, damit das Interface sowohl für synchrone (InMemory) als auch asynchrone (File, Dynamo) Implementierungen gilt.
+### New: `IRepository<T>`
+Generic interface with CRUD methods. All methods return `Promise` so the interface works for both synchronous (InMemory) and asynchronous (File, DynamoDB) implementations.
 
 ```typescript
 interface IRepository<T extends { id: string }> {
@@ -35,16 +35,16 @@ interface IRepository<T extends { id: string }> {
 }
 ```
 
-### Neu: `AbstractRepository<T>`
-Abstrakte Basisklasse mit `protected items: T[] = []`. Implementiert `getAll` und `getById` – diese Logik ist für alle Implementierungen identisch. `create`, `update`, `delete` sind `abstract` – müssen von Subklassen implementiert werden.
+### New: `AbstractRepository<T>`
+Abstract base class with `protected items: T[] = []`. Implements `getAll` and `getById` — this logic is identical across all implementations. `create`, `update`, `delete` are `abstract` and must be implemented by subclasses.
 
-### Neu: `InMemoryRepository<T>`
-Konkrete Implementierung, die nur mit dem internen Array arbeitet. Kein Filesystem. Primär für Tests gedacht – der `TodoService` kann damit ohne Datei getestet werden.
+### New: `InMemoryRepository<T>`
+Concrete implementation that only works with the internal array. No filesystem. Primarily for testing — `TodoService` can be tested without any file.
 
-### Neu: `FileRepository<T>`
-Erweitert `InMemoryRepository` und ergänzt nach jeder Mutation (`create`, `update`, `delete`) ein `saveFile()`. Nutzt `super.methode()` um die Array-Logik der Elternklasse wiederzuverwenden.
+### New: `FileRepository<T>`
+Extends `InMemoryRepository` and adds a `saveFile()` call after each mutation (`create`, `update`, `delete`). Uses `super.method()` to reuse the parent class array logic.
 
-**Static Factory Method** für sichere Initialisierung:
+**Static factory method** for safe initialization:
 ```typescript
 static async create<T extends { id: string }>(): Promise<FileRepository<T>> {
     const repo = new FileRepository<T>();
@@ -53,8 +53,8 @@ static async create<T extends { id: string }>(): Promise<FileRepository<T>> {
 }
 ```
 
-### Neu: `TodoService`
-Enthält die gesamte Business-Logik. Bekommt ein `IRepository<Todo>` per **Dependency Injection** im Konstruktor – weiß nicht, ob dahinter ein File, InMemory oder DynamoDB steckt.
+### New: `TodoService`
+Contains all business logic. Receives an `IRepository<Todo>` via **dependency injection** in the constructor — it doesn't know whether a file, in-memory store, or DynamoDB is behind it.
 
 ```typescript
 class TodoService {
@@ -62,20 +62,20 @@ class TodoService {
 }
 ```
 
-### Geändert: `app.ts`
-Verdrahtet Repository und Service mittels IIFE-Pattern:
+### Changed: `app.ts`
+Wires up repository and service using the IIFE pattern:
 ```typescript
 (async () => {
     const fileRepo = await FileRepository.create<Todo>();
     const todoService = new TodoService(fileRepo);
-    // switch-block ...
+    // switch block ...
 })();
 ```
 
-### Geändert: `Todo`-Interface
-`data` ist nun optional (`data?: TData`) statt zwingend erforderlich.
+### Changed: `Todo` Interface
+`data` is now optional (`data?: TData`) instead of required.
 
-## Dateistruktur
+## File Structure
 ```
 src/
   app.ts
@@ -91,10 +91,15 @@ src/
     TodoService.ts
 ```
 
-## Kernkonzept: Dependency Inversion
-Der `TodoService` hängt nicht von `FileRepository` ab, sondern von `IRepository<Todo>`. Das bedeutet:
-- In **Tests**: `new TodoService(new InMemoryRepository())`
-- In **Produktion**: `new TodoService(new FileRepository())`
-- In **Phase 5**: `new TodoService(new DynamoRepository())`
+## Core Concept: Dependency Inversion
+The `TodoService` does not depend on `FileRepository`, but on `IRepository<Todo>`. This means:
+- In **tests**: `new TodoService(new InMemoryRepository())`
+- In **production**: `new TodoService(new FileRepository())`
+- In **Phase 5**: `new TodoService(new DynamoDbRepository())`
 
-Der Service wird dabei **nie angefasst** – nur das Repository wird ausgetauscht.
+The service is **never touched** — only the repository is swapped.
+
+## What's Still Missing (Motivation for Phase 4)
+- `app.ts` is a CLI tool — only usable from the command line
+- No HTTP interface, no parallel requests, no external accessibility
+- Phase 4 replaces the CLI with an Express REST API — the `TodoService` remains completely unchanged

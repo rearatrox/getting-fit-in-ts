@@ -1,52 +1,74 @@
 # getting-fit-in-ts
 
-Ein iterativ wachsendes Lernprojekt: dasselbe Todo-CLI-Tool wird von Phase zu Phase mit mehr TypeScript-Wissen und besserer Architektur neu gebaut – von Plain JavaScript bis zu einer AWS Serverless API.
+An iteratively growing learning project: the same Todo tool is rebuilt phase by phase with more TypeScript knowledge and better architecture — from Plain JavaScript to a fully deployed AWS Serverless API.
 
-## Idee
+## Idea
 
-Statt verschiedene Beispielprojekte zu bauen, wächst hier **ein einziges Projekt** mit jeder Phase. Das macht die Unterschiede zwischen den Ansätzen direkt vergleichbar – man sieht, welches Problem jede Phase löst und was vorher gefehlt hat.
+Instead of building different example projects, **a single project** grows with each phase. This makes the differences between approaches directly comparable — you can see exactly what problem each phase solves and what was missing before.
 
-## Projektstruktur
+## Project Structure
 
 ```
-phase-1-a-plain-js-todo/    ← Ausgangspunkt: reines JavaScript, keine Typen
-phase-1-b-ts-todo/          ← direkte TypeScript-Migration, gleiche Logik
-phase-2-classes-generics/   ← Kapselung in Klassen, Generics eingeführt
+phase-1-a-plain-js-todo/      ← starting point: plain JavaScript, no types
+phase-1-b-ts-todo/            ← direct TypeScript migration, same logic
+phase-2-classes-generics/     ← encapsulation in classes, generics introduced
 phase-3-repo-service-pattern/ ← Repository/Service Pattern, Dependency Injection
-phase-4-rest-api/           ← (geplant) Express-API, Service bleibt unverändert
-phase-5-aws-serverless/     ← (geplant) Lambda + DynamoDB, Repository-Swap
+phase-4-rest-api/             ← Express REST API, Zod validation, error handling
+phase-5-aws/                  ← AWS Lambda + DynamoDB + API Gateway via CDK
 ```
 
-Jede Phase hat eine eigene `README.md` mit den konkreten Änderungen und der Motivation für die nächste Phase.
+Each phase has its own `README.md` describing the concrete changes and the motivation for the next phase.
 
-## Aktueller Stand
+## Current Status
 
-| Phase | Status | Kernthema |
+| Phase | Status | Core Topic |
 |---|---|---|
-| 1a – Plain JS | ✅ | Ausgangspunkt ohne Typsystem |
-| 1b – TypeScript | ✅ | Interfaces, Union-Types, typisierte Funktionen |
-| 2 – Klassen & Generics | ✅ | Klassen, `private`/`readonly`, generische Interfaces |
-| 3 – Repository/Service | ✅ | IRepository, Dependency Injection, abstrakte Klassen |
-| 4 – REST API | ✅  | Express, Zod, Error-Klassen |
-| 5 – AWS Serverless | ⏳ | Lambda, DynamoDB, CDK |
+| 1a – Plain JS | ✅ | Starting point without a type system |
+| 1b – TypeScript | ✅ | Interfaces, union types, typed functions |
+| 2 – Classes & Generics | ✅ | Classes, `private`/`readonly`, generic interfaces |
+| 3 – Repository/Service | ✅ | IRepository, dependency injection, abstract classes |
+| 4 – REST API | ✅ | Express, Zod, custom error classes |
+| 5 – AWS Serverless | ✅ | Lambda, DynamoDB, API Gateway, CDK, API Key |
 
-## Lokale Ausführung
+## Running Locally
 
-Jede Phase ist ein eigenständiges Node.js-Projekt mit eigenem `package.json`.
+Each phase is a standalone Node.js project with its own `package.json`.
 
+**Phases 1–3 (CLI):**
 ```bash
 cd phase-3-repo-service-pattern
 npm install
-npx ts-node src/app.ts add "Einkaufen"
+npx ts-node src/app.ts add "Buy groceries"
 npx ts-node src/app.ts list
 npx ts-node src/app.ts done <id>
 npx ts-node src/app.ts delete <id>
 ```
 
-## Roter Faden
+**Phase 4 (REST API):**
+```bash
+cd phase-4-rest-api
+npm install
+npx ts-node src/app.ts
+# API running at http://localhost:3000/api/todo
+```
 
-Das zentrale Architekturziel, das sich durch alle Phasen zieht:
+**Phase 5 (AWS Serverless — local testing):**
+```bash
+cd phase-5-aws
+docker run -d -p 8000:8000 amazon/dynamodb-local
+bash setup-local-dynamo.sh
+DYNAMO_ENDPOINT=http://localhost:8000 npx ts-node src/app.ts
+```
 
-> Der `TodoService` wird **nie angefasst** – egal ob die Daten aus einer Datei, einer REST API oder DynamoDB kommen.
+## The Common Thread
 
-Das ist möglich, weil `TodoService` nur gegen `IRepository<Todo>` programmiert ist. In Phase 4 ersetzt Express die CLI – der Service bleibt. In Phase 5 ersetzt `DynamoRepository` das `FileRepository` – der Service bleibt.
+The central architectural goal that runs through every phase:
+
+> The `TodoService` is **never touched** — regardless of whether data comes from a file, a REST API, or DynamoDB.
+
+This is possible because `TodoService` only depends on `IRepository<Todo>`:
+
+- Phase 3/4 → `new TodoService(new FileRepository())`
+- Phase 5 → `new TodoService(new DynamoDbRepository())`
+
+Only the repository is swapped — the service and all business logic stay identical.
